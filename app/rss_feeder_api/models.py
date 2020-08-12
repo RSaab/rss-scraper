@@ -54,10 +54,17 @@ class Feed(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
     following = models.BooleanField(default=True)
 
+    owner = models.ForeignKey('auth.User', related_name='snippets', on_delete=models.CASCADE)
+
     class Meta: 
         verbose_name = ("Feed")
         verbose_name_plural = ("Feeds")
         
+
+    def save(self, *args, **kwargs):
+        self.register()
+        self.language = "nl"
+        super(Feed, self).save(*args, **kwargs)
 
     def __str__(self):
         return f'Nickname: {self.nickname}'
