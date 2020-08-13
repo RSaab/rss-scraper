@@ -77,59 +77,105 @@ def test_auth_view(auto_login_user):
    assert response.status_code == 200
 
 @pytest.mark.django_db
+@pytest.mark.django_db(transaction=True)
 def test_user_create():
     User.objects.create_user('john', 'lennon@thebeatles.com', 'johnpassword')
     assert User.objects.count() == 1
 
 
 @pytest.mark.django_db(transaction=True)
-def test_register_feed_broker(broker, worker):
+def test_register_feed(broker, worker):
+    user = User.objects.create_user('john', 'lennon@thebeatles.com', 'johnpassword')
+    assert User.objects.count() == 1
+
+    feed = Feed.objects.create(link="https://feeds.feedburner.com/tweakers/mixed", owner=user, nickname="test")
+    assert Feed.objects.count() == 1
+    assert Entry.objects.count() == 0
+
+
+@pytest.mark.django_db(transaction=True)
+def test_register_and_update_feed(broker, worker):
+    user = User.objects.create_user('john', 'lennon@thebeatles.com', 'johnpassword')
+    assert User.objects.count() == 1
+
+    feed = Feed.objects.create(link="https://www.nu.nl/rss/Algemeen", owner=user, nickname="test")
+
+    feed.force_pdate()
+
+    broker.join("default")
+    worker.join()
+
+    assert Feed.objects.count() == 1
+    assert Entry.objects.count() > 0
+
+@pytest.mark.django_db(transaction=True)
+def test_register_and_update_feed_with_redirect(broker, worker):
+    user = User.objects.create_user('john', 'lennon@thebeatles.com', 'johnpassword')
+    assert User.objects.count() == 1
+
+    feed = Feed.objects.create(link="http://www.nu.nl/rss/Algemeen", owner=user, nickname="test")
+
+    feed.force_pdate()
+
+    broker.join("default")
+    worker.join()
+
+    assert Feed.objects.count() == 1
+    assert Entry.objects.count() > 0
+
+
+@pytest.mark.django_db(transaction=True)
+def test_register_and_update_feed_2(broker, worker):
     user = User.objects.create_user('john', 'lennon@thebeatles.com', 'johnpassword')
     assert User.objects.count() == 1
 
     feed = Feed.objects.create(link="https://feeds.feedburner.com/tweakers/mixed", owner=user, nickname="test")
 
     feed.force_pdate()
-    # feed._updateFeed.send_with_options(args=(feed.id,))
+
     broker.join("default")
     worker.join()
 
     assert Feed.objects.count() == 1
-    assert Entry.objects.count() == 40
-    
-# @pytest.mark.django_db
-# def test_register_feed():
-#     user = User.objects.create_user('john', 'lennon@thebeatles.com', 'johnpassword')
-#     assert User.objects.count() == 1
+    assert Entry.objects.count() > 0
 
-#     feed = Feed.objects.create(link="https://feeds.feedburner.com/tweakers/mixed", owner=user, nickname="test")
-    
-    # assert Feed.objects.count() == 1
-#     time.sleep(5)
-#     assert Entry.objects.count() == 40
+@pytest.mark.django_db(transaction=True)
+def test_register_and_update_feed_twice(broker, worker):
+    user = User.objects.create_user('john', 'lennon@thebeatles.com', 'johnpassword')
+    assert User.objects.count() == 1
 
-# @pytest.mark.django_db
-# def test_register_feed_2():
-#     user = User.objects.create_user('john', 'lennon@thebeatles.com', 'johnpassword')
-#     assert User.objects.count() == 1
+    feed = Feed.objects.create(link="https://feeds.feedburner.com/tweakers/mixed", owner=user, nickname="test")
 
-#     feed = Feed.objects.create(link="https://www.nu.nl/rss/Algemeen", owner=user, nickname="test")
-    
-#     print(feed.id)
-#     time.sleep(1)
+    feed.force_pdate()
+    feed.force_pdate()
 
-#     assert Feed.objects.count() == 1
-#     assert Entry.objects.count() == 10
+    broker.join("default")
+    worker.join()
 
-# @pytest.mark.django_db
-# @pytest.mark.xfail(raises=FeedError)
-# def test_feed_invalid_link():
-#     '''
-#     Invalid link 404 not found
-#     '''
-#     user = User.objects.create_user('john', 'lennon@thebeatles.com', 'johnpassword')
-#     assert User.objects.count() == 1
+    assert Feed.objects.count() == 1
+    assert Entry.objects.count() > 0
 
-    
-#     with pytest.raises(FeedError) as e:
-#         assert Feed.objects.create(link="https://www.nu.nl/rss/Algemeennnn", owner=user, nickname="test")
+
+@pytest.mark.django_db(transaction=True)
+@pytest.mark.xfail(raises=FeedError)
+def test_register_and_update_invalid_field(broker, worker):
+    user = User.objects.create_user('john', 'lennon@thebeatles.com', 'johnpassword')
+    assert User.objects.count() == 1
+
+    feed = Feed.objects.create(link="https://feeds.feedburner.com/WootWoot/mixed", owner=user, nickname="test")
+
+    feed.force_pdate()
+
+    broker.join("default")
+    worker.join()
+
+    time.sleep(2)
+    print("updating again")
+    feed.force_pdate()
+
+    broker.join("default")
+    worker.join()
+
+
+    assert Feed.objects.count() == 1
+    assert Entry.objects.count() == 0

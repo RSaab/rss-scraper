@@ -6,6 +6,8 @@ from django.shortcuts import get_object_or_404
 import datetime
 import time
 
+from django.utils import timezone
+
 import backoff
 import dramatiq
 
@@ -15,7 +17,7 @@ from django.utils.translation import ugettext_lazy as _
 from rss_feeder_api.constants import ENTRY_UNREAD, ENTRY_READ, ENTRY_SAVED
 
 from rss_feeder_api import managers
-from rss_feeder_api.dramatiq_error_handlers import print_error
+from rss_feeder_api.dramatiq_error_handlers import feed_update_failure
 
 from django.core.validators import URLValidator
 import feedparser
@@ -97,10 +99,10 @@ class Feed(models.Model):
 
     def force_pdate(self, *args, **kwargs):
         print("Forcing update...")
-        self._updateFeed.send_with_options(args=(self.id,), on_failure=print_error)
+        self._updateFeed.send_with_options(args=(self.id,), on_failure=feed_update_failure)
         return
 
-    @backoff.on_exception(backoff.expo, FeedError, max_tries=5)
+    @backoff.on_exception(backoff.expo, FeedError, max_tries=2)
     def _fetch_feed(self):
         '''
         internal method to get feed details
@@ -124,6 +126,12 @@ class Feed(models.Model):
 
         if status in (404, 500, 502, 503, 504):
             raise FeedError('Temporary error %s' % status)
+
+        # Follow permanent redirection
+        if status == 301:
+            # Avoid circular redirection
+            self.link = d.get('href', self.link)
+            return self._fetch_feed()
 
         if status == 410:
             raise InactiveFeedError('Feed has gone')
@@ -180,11 +188,14 @@ class Feed(models.Model):
 
                 
                 if newEntry:
-                    id = newEntry.id
-                    newEntry =  entry
-                    newEntry.id = id
-                    print(f'OLD ENTRY: {newEntry}')
-                    dbEntriesupdate.append(newEntry)
+                    # if it was updated, then mark it as unread, otherwise no need to do anything
+                    if newEntry.pubdate > entry.pubdate:
+                        entry.state = ENTRY_UNREAD
+                        id = newEntry.id
+                        newEntry =  entry
+                        newEntry.id = id
+                        print(f'OLD ENTRY: {newEntry}')
+                        dbEntriesupdate.append(newEntry)
                 else:
                     dbEntriesCreate.append(entry)
 
