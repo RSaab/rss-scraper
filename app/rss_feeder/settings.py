@@ -12,9 +12,12 @@ https://docs.djangoproject.com/en/3.1/ref/settings/
 
 from pathlib import Path
 
+from django.conf import settings
+
+import bleach
+
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve(strict=True).parent.parent
-
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/3.1/howto/deployment/checklist/
@@ -120,3 +123,81 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/3.1/howto/static-files/
 
 STATIC_URL = '/static/'
+
+
+#
+# Bleach settings for rss_feeder_api
+#
+
+# HTML whitelist for bleach
+# This default list is roughly the same as the WHATWG sanitization rules
+# <http://wiki.whatwg.org/wiki/Sanitization_rules>, but without form elements.
+# A few common HTML 5 elements have been added as well.
+ALLOWED_TAGS = getattr(
+    settings, 'RSS_FEEDER_ALLOWED_TAGS',
+    [
+        'a',
+        'abbr',
+        'acronym',
+        'aside',
+        'b',
+        'bdi',
+        'bdo',
+        'blockquote',
+        'br',
+        'code',
+        'data',
+        'dd',
+        'del',
+        'dfn',
+        'div',  # Why not?
+        'dl',
+        'dt',
+        'em',
+        'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
+        'hr',
+        'i',
+        'img',
+        'ins',
+        'kbd',
+        'li',
+        'ol',
+        'p',
+        'pre',
+        'q',
+        's',
+        'samp',
+        'small',  # Now a semantic tag in HTML5!
+        'span',
+        'strike',
+        'strong',
+        'sub', 'sup',
+        'table', 'tbody', 'td', 'tfoot', 'th', 'thead', 'tr',
+        'time',
+        'tt',  # Obsolete, but docutils likes to generate these.
+        'u',
+        'var',
+        'wbr',
+        'ul',
+    ]
+)
+ALLOWED_ATTRIBUTES = getattr(
+    settings, 'RSS_FEEDER_ALLOWED_ATTRIBUTES',
+    {
+        '*':        ['lang', 'dir'],  # lang is necessary for hyphentation.
+        'a':        ['href', 'title'],
+        'abbr':     ['title'],
+        'acronym':  ['title'],
+        'data':     ['value'],
+        'dfn':      ['title'],
+        'img':      ['src', 'alt', 'width', 'height', 'title'],
+        'li':       ['value'],
+        'ol':       ['reversed', 'start', 'type'],
+        'td':       ['align', 'valign', 'width', 'colspan', 'rowspan'],
+        'th':       ['align', 'valign', 'width', 'colspan', 'rowspan'],
+        'time':     ['datetime'],
+    }
+)
+ALLOWED_STYLES = getattr(
+    settings, 'RSS_FEEDER_ALLOWED_STYLES', bleach.ALLOWED_STYLES,
+)
