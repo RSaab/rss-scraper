@@ -34,6 +34,7 @@ ALLOWED_HOSTS = []
 # Application definition
 
 INSTALLED_APPS = [
+    "django_dramatiq",
     'rss_feeder_api.apps.RssFeederApiConfig',
     'rest_framework',
     'django.contrib.admin',
@@ -201,3 +202,41 @@ ALLOWED_ATTRIBUTES = getattr(
 ALLOWED_STYLES = getattr(
     settings, 'RSS_FEEDER_ALLOWED_STYLES', bleach.ALLOWED_STYLES,
 )
+
+
+# DRAMATIQ_BROKER = {
+#     "BROKER": "dramatiq.brokers.stub.StubBroker",
+#     "OPTIONS": {},
+#     "MIDDLEWARE": [
+#         "dramatiq.middleware.AgeLimit",
+#         "dramatiq.middleware.TimeLimit",
+#         "dramatiq.middleware.Callbacks",
+#         "dramatiq.middleware.Pipelines",
+#         "dramatiq.middleware.Retries",
+#         "django_dramatiq.middleware.AdminMiddleware",
+#         "django_dramatiq.middleware.DbConnectionsMiddleware",
+#     ]
+# }
+
+
+DRAMATIQ_BROKER = {
+    "BROKER": "dramatiq.brokers.rabbitmq.RabbitmqBroker",
+    "OPTIONS": {
+        "url": "amqp://localhost:5672",
+    },
+    "MIDDLEWARE": [
+        "dramatiq.middleware.Prometheus",
+        "dramatiq.middleware.AgeLimit",
+        "dramatiq.middleware.TimeLimit",
+        "dramatiq.middleware.Callbacks",
+        "dramatiq.middleware.Retries",
+        "django_dramatiq.middleware.AdminMiddleware",
+        "django_dramatiq.middleware.DbConnectionsMiddleware",
+    ]
+}
+
+# Defines which database should be used to persist Task objects when the
+# AdminMiddleware is enabled.  The default value is "default".
+DRAMATIQ_TASKS_DATABASE = "default"
+
+APPEND_SLASH=True

@@ -1,8 +1,13 @@
 from django.db import models
 
+from django.db import transaction
+from django.shortcuts import get_object_or_404
+
 import datetime
 import time
 
+import backoff
+import dramatiq
 
 from django.utils.encoding import smart_text as smart_unicode
 from django.utils.translation import ugettext_lazy as _
@@ -10,6 +15,7 @@ from django.utils.translation import ugettext_lazy as _
 from rss_feeder_api.constants import ENTRY_UNREAD, ENTRY_READ, ENTRY_SAVED
 
 from rss_feeder_api import managers
+from rss_feeder_api.dramatiq_error_handlers import print_error
 
 from django.core.validators import URLValidator
 import feedparser
@@ -66,7 +72,7 @@ class Feed(models.Model):
     class Meta: 
         verbose_name = ("Feed")
         verbose_name_plural = ("Feeds")
-        ordering = ('-pubdate',)
+        ordering = ('-updated_at',)
         unique_together = ('link', 'owner')
 
     
@@ -76,28 +82,32 @@ class Feed(models.Model):
     def __str__(self):
         return f'Nickname: {self.nickname}'
 
+
     def save(self, *args, **kwargs):
-        feed, entries = self.fetchFeed()
+
+        # assure minimum required fields   
+        assert self.link
+        assert self.nickname
+
         super(Feed, self).save(*args, **kwargs)
 
-        if entries:
-            for raw_entry in entries:
-                entry = Entry.objects.parseFromFeed(raw_entry)
-                entry.feed = self
-                entry.save()
+        assert self.id > 0
 
         return
 
     def force_pdate(self, *args, **kwargs):
         print("Forcing update...")
-        raise NotImplementedError
+        self._updateFeed.send_with_options(args=(self.id,), on_failure=print_error)
+        return
 
+    @backoff.on_exception(backoff.expo, FeedError, max_tries=1)
     def _fetch_feed(self):
         '''
         internal method to get feed details
         '''
         # Request and parse the feed
-        d = feedparser.parse(self.link)
+        link = self.link
+        d = feedparser.parse(link)
         status  = d.get('status', 200)
         feed    = d.get('feed', None)
         entries = d.get('entries', None)
@@ -121,25 +131,26 @@ class Feed(models.Model):
         # Unknown status
         raise FeedError('Unrecognised HTTP status %s' % status)
 
-    def fetchFeed(self, *args, **kwargs):
-        
-        # make sure link exists
-        assert self.link
-        
-        feed, entries = self._fetch_feed()
-        
-        self.title = feed.get('title', None)
-        self.subtitle = feed.get('subtitle', None)
-        self.copyright = feed.get('rights', None)
-        self.link = feed.get('link', None)
-        self.ttl = feed.get('ttl', None)
-        self.atomLogo = feed.get('logo', None)
 
+    @dramatiq.actor(max_retries=1, min_backoff=1, throws=FeedError)
+    @transaction.atomic
+    def _updateFeed(pk):
+
+        feed = get_object_or_404(Feed, pk=pk)
+
+        rawFeed, entries = feed._fetch_feed() 
+
+        feed.title = rawFeed.get('title', None)
+        feed.subtitle = rawFeed.get('subtitle', None)
+        feed.copyright = rawFeed.get('rights', None)
+        feed.link = rawFeed.get('link', None)
+        feed.ttl = rawFeed.get('ttl', None)
+        feed.atomLogo = rawFeed.get('logo', None)
 
         # Try to find the updated time
-        updated = feed.get(
+        updated = rawFeed.get(
             'updated_parsed',
-            feed.get('published_parsed', None),
+            rawFeed.get('published_parsed', None),
         )
 
         if updated:
@@ -147,8 +158,44 @@ class Feed(models.Model):
                 time.mktime(updated)
             )
 
-        self.pubdate = updated
-        return feed, entries
+        feed.pubdate = updated
+
+        super(Feed, feed).save()
+
+        # print(f'THE FEED: {feed}')
+
+        if entries:
+            # print(f'THE ENTRIES: {entries}')
+            dbEntriesCreate = []
+            dbEntriesupdate = []
+            for raw_entry in entries:
+                entry = Entry.objects.parseFromFeed(raw_entry)
+                entry.feed = feed
+                # newEntry, created = Entry.objects.get_or_create(feed_id=feed.id, guid=entry.guid)
+
+                try:
+                    newEntry = Entry.objects.get(guid=entry.guid)
+                except:
+                    newEntry = None
+
+                
+                if newEntry:
+                    id = newEntry.id
+                    newEntry =  entry
+                    newEntry.id = id
+                    print(f'OLD ENTRY: {newEntry}')
+                    dbEntriesupdate.append(newEntry)
+                else:
+                    dbEntriesCreate.append(entry)
+
+            with transaction.atomic():
+                if len(dbEntriesCreate)>0:
+                    Entry.objects.bulk_create(dbEntriesCreate)
+                if len(dbEntriesupdate)>0:
+                    fields = ['feed', 'state', 'expires', 'title' , 'content', 'date', 'author', 'url' ,'comments_url']
+                    Entry.objects.bulk_update(dbEntriesupdate, fields)
+
+        return
 
 # Enrty #################################################   
 class Entry(models.Model):
@@ -192,6 +239,9 @@ class Entry(models.Model):
         help_text="GUID for the entry, according to the feed",
     )
 
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
     objects = managers.EntryManager()
     
     def __unicode__(self):
@@ -206,5 +256,6 @@ class Entry(models.Model):
         super(Entry, self).save(*args, **kwargs)
         
     class Meta:
-        ordering = ('-date',)
+        ordering = ('-updated_at',)
         verbose_name_plural = 'entries'
+        unique_together = ['guid']

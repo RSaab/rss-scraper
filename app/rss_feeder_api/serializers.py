@@ -25,5 +25,5 @@ class EntrySerializer(serializers.ModelSerializer):
     class Meta:
         model = Entry
         fields = ['id', 'feed', 'state', 'expires', 'title' , 
-        'content', 'date', 'author', 'url' ,'comments_url', 'guid']
+        'content', 'date', 'author', 'url' ,'comments_url', 'guid', 'created_at', 'updated_at']
         ordering = ['-date']
