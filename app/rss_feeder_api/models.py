@@ -100,7 +100,7 @@ class Feed(models.Model):
         self._updateFeed.send_with_options(args=(self.id,), on_failure=print_error)
         return
 
-    @backoff.on_exception(backoff.expo, FeedError, max_tries=1)
+    @backoff.on_exception(backoff.expo, FeedError, max_tries=5)
     def _fetch_feed(self):
         '''
         internal method to get feed details
@@ -132,7 +132,7 @@ class Feed(models.Model):
         raise FeedError('Unrecognised HTTP status %s' % status)
 
 
-    @dramatiq.actor(max_retries=1, min_backoff=1, throws=FeedError)
+    @dramatiq.actor(max_retries=4, min_backoff=4, throws=FeedError)
     @transaction.atomic
     def _updateFeed(pk):
 

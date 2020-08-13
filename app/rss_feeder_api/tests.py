@@ -82,7 +82,7 @@ def test_user_create():
     assert User.objects.count() == 1
 
 
-@pytest.mark.django_db
+@pytest.mark.django_db(transaction=True)
 def test_register_feed_broker(broker, worker):
     user = User.objects.create_user('john', 'lennon@thebeatles.com', 'johnpassword')
     assert User.objects.count() == 1
@@ -93,11 +93,8 @@ def test_register_feed_broker(broker, worker):
     # feed._updateFeed.send_with_options(args=(feed.id,))
     broker.join("default")
     worker.join()
-    assert Feed.objects.count() == 1
 
-    time.sleep(5)
-    # entry = get_object_or_404(Entry, pk=1)
-    # print(entry)
+    assert Feed.objects.count() == 1
     assert Entry.objects.count() == 40
     
 # @pytest.mark.django_db
