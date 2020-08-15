@@ -64,7 +64,7 @@ ALLOWED_HOSTS = os.environ.get("DJANGO_ALLOWED_HOSTS", "localhost 127.0.0.1").sp
 
 INSTALLED_APPS = [
     'drf_yasg',
-    "django_dramatiq",
+    'django_dramatiq',
     'rss_feeder_api.apps.RssFeederApiConfig',
     'rest_framework',
     'django.contrib.admin',
@@ -223,6 +223,7 @@ ALLOWED_TAGS = getattr(
         'ul',
     ]
 )
+
 ALLOWED_ATTRIBUTES = getattr(
     settings, 'RSS_FEEDER_ALLOWED_ATTRIBUTES',
     {
@@ -240,6 +241,7 @@ ALLOWED_ATTRIBUTES = getattr(
         'time':     ['datetime'],
     }
 )
+
 ALLOWED_STYLES = getattr(
     settings, 'RSS_FEEDER_ALLOWED_STYLES', bleach.ALLOWED_STYLES,
 )
