@@ -17,4 +17,8 @@ router.register('notification', views.NotificationList, basename='all-notificati
 router.register('notification', views.NotificationUpdateState, basename='notification-detail')
 
 
-urlpatterns = router.urls
+# urlpatterns = router.urls
+
+urlpatterns = [
+	 path(r'^/', include((router.urls))),
+]

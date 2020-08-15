@@ -68,25 +68,25 @@ def api_client():
 
 @pytest.mark.django_db
 def test_unauthorized_request(api_client):
-   url = reverse('all-feeds')
+   url = reverse('all-feeds-list')
    response = api_client.get(url)
    assert response.status_code == 403, "all-feeds"
 
-   url = reverse('all-users')
+   url = reverse('all-users-list')
    response = api_client.get(url)
    assert response.status_code == 403, "all-users"
 
-   url = reverse('all-notifications')
+   url = reverse('all-notifications-list')
    response = api_client.get(url)
    assert response.status_code == 403, "all-notifications"
 
 
-   url = reverse('all-entries')
+   url = reverse('all-entries-list')
    response = api_client.get(url)
    assert response.status_code == 403, "all-entries"
 
 
-   url = reverse('feed-detail',  kwargs={'pk':1})
+   url = reverse('feeds-detail-detail',  kwargs={'pk':1})
    response = api_client.get(url)
    assert response.status_code == 403, "feed-detail"
 
@@ -94,18 +94,18 @@ def test_unauthorized_request(api_client):
    response = api_client.get(url)
    assert response.status_code == 403, "user-detail"
 
-   url = reverse('notification-detail', kwargs={'pk':1})
+   url = reverse('notification-detail-detail', kwargs={'pk':1})
    response = api_client.get(url)
    assert response.status_code == 403, "notification-detail"
 
-   url = reverse('entry-detail', kwargs={'pk':1})
+   url = reverse('entry-detail-detail', kwargs={'pk':1})
    response = api_client.get(url)
    assert response.status_code == 403, "entry-detail"
 
 @pytest.mark.django_db
 def test_auth_view(auto_login_user):
    client, user = auto_login_user()
-   url = reverse('all-feeds')
+   url = reverse('all-feeds-list')
    response = client.get(url)
    print(response)
    assert response.status_code == 200
