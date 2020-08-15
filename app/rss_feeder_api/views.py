@@ -10,50 +10,51 @@ from rss_feeder_api.constants import ENTRY_UNREAD, ENTRY_READ, ENTRY_SAVED
 
 from django.shortcuts import get_object_or_404
 
+from django.utils.decorators import method_decorator
 
 from drf_yasg import openapi
 from drf_yasg.inspectors import SwaggerAutoSchema
 from drf_yasg.utils import swagger_auto_schema
 
-from djangorestframework_camel_case.parser import CamelCaseJSONParser
-from djangorestframework_camel_case.render import CamelCaseJSONRenderer
-from inflection import camelize
 from rest_framework.parsers import FileUploadParser, FormParser
 
-
-# from django.views import View
-
-from rest_framework import viewsets
+from rest_framework import viewsets, parsers
 
 from rest_framework import mixins
+from rest_framework.decorators import action
 
-# Users
-class UserList(generics.ListAPIView):
+class UserList(mixins.ListModelMixin,
+                   viewsets.GenericViewSet):
     """
     get:
         View all users
     """
-    allowed_methods = ('GET')
+
+    def get(self, request, *args, **kwargs):
+        return self.list(request, *args, **kwargs)
 
     permission_classes = [permissions.IsAdminUser]
     queryset = User.objects.filter()
     serializer_class = UserSerializer
 
 
-class UserDetail(generics.ListAPIView):
+class UserDetail(mixins.RetrieveModelMixin,
+                   viewsets.GenericViewSet):
     """
     get:
         view a single user by id
     """
-    allowed_methods = ('GET')
+    def get(self, request, *args, **kwargs):
+        return self.list(request, *args, **kwargs)
 
     permission_classes = [permissions.IsAdminUser]
     queryset = User.objects.all()
     serializer_class = UserSerializer
 
 
-# Entries
-class EntryList(generics.ListAPIView):
+
+class EntryList(mixins.ListModelMixin,
+                   viewsets.GenericViewSet):
     """
     get:
         View all entries.
@@ -70,7 +71,6 @@ class EntryList(generics.ListAPIView):
               description: filter based on read status
               required: false
     """
-    allowed_methods = ('GET')
     permission_classes = [permissions.IsAuthenticated]
     def get_queryset(self):
         feed_id = self.request.GET.get('feed_id', None)
@@ -93,7 +93,10 @@ class EntryList(generics.ListAPIView):
     queryset = Entry.objects.all()
     serializer_class = EntrySerializer
 
-class EntryDetail(generics.RetrieveUpdateAPIView):
+
+@swagger_auto_schema(method='put', auto_schema=None)
+@action(detail=False, methods=['put'])
+class EntryDetail(mixins.RetrieveModelMixin, mixins.UpdateModelMixin, viewsets.GenericViewSet):
     """
     Entry Details
     
@@ -110,7 +113,6 @@ class EntryDetail(generics.RetrieveUpdateAPIView):
               description: the desired read status of the entry (true/false)
               required: false
     """
-    allowed_methods = ('PATCH')
     permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
@@ -133,19 +135,17 @@ class EntryDetail(generics.RetrieveUpdateAPIView):
     queryset = Entry.objects.all()
     serializer_class = EntrySerializer
 
-# Feeds
-class FeedList(generics.ListCreateAPIView):
+class FeedList(mixins.CreateModelMixin,
+                   mixins.ListModelMixin,
+                   viewsets.GenericViewSet):#(viewsets.ModelViewSet):#(generics.ListCreateAPIView):
     """
     Feed API
-
     get:
         View all feeds
-
     post:
         Create a new feed item. The feed is not updated until the next async update job is run or a separate force update is called
     """
     permission_classes = [permissions.IsAuthenticated]
-    allowed_methods = ('GET','POST')
 
     def perform_create(self, serializer):
         serializer.save(owner=self.request.user)
@@ -162,43 +162,44 @@ class FeedList(generics.ListCreateAPIView):
     queryset = Feed.objects.all()
     serializer_class = FeedSerializer
 
+from rest_framework import parsers
 
-class FeedDetail(generics.RetrieveUpdateDestroyAPIView):
+class FeedDetail(mixins.RetrieveModelMixin,
+                   mixins.UpdateModelMixin,
+                   mixins.DestroyModelMixin,
+                   viewsets.GenericViewSet):#(generics.RetrieveUpdateDestroyAPIView):
     """
-    Feed Detail API
+        Feed Detail API
+        
+        get:
+            View a single feed item
+        patch:
+            This endpoint allows the update of a feed's follow status
 
-    get:
-        View a single feed item
-
-    put:
-        Update a feed item in the database, you can modify any field except the created_at
-        and modified_at fields. The nickname and link are required
-
-    patch:
-        This endpoint allows the update of a feed's follow status
-
-        Query Parameters:
-            - name: follow
-              in: path
-              type: boolean
-              description: Describes whether a user wantes to follow the feed or not (true/false)
-              required: false
-            - name: force_update
-              in: path
-              type: boolean
-              description: If set to true, will force an async update on the feed, default is false (true/false)
-              required: false
-    delete:
-        Delete a feed entry. This action will also delete all referencing entries and notifications
+            Parameters:
+                - name: follow
+                  in: path
+                  type: boolean
+                  description: Describes whether a user wantes to follow the feed or not (true/false)
+                  required: false
+                - name: force_update
+                  in: path
+                  type: boolean
+                  description: If set to true, will force an async update on the feed, default is false (true/false)
+                  required: false
+        delete:
+            Delete a feed entry. This action will also delete all referencing entries and notifications
+            parameter: force
     """
-    allowed_methods = ('GET','PUT', 'PATCH', "DELETE")
-    
     permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
         return Feed.objects.filter(owner=self.request.user)
-
+    
     def put(self, request, *args, **kwargs):
+        """
+        Feed Put 
+        """
         feed = self.get_object()
         serializer = FeedSerializer(feed, data=request.data)
 
@@ -231,13 +232,11 @@ class FeedDetail(generics.RetrieveUpdateDestroyAPIView):
     serializer_class = FeedSerializer
 
 
-# Notifications
-class NotificationList(generics.ListAPIView):
+class NotificationList(viewsets.ModelViewSet):
     """
     get:
         View all notifications
     """
-    allowed_methods = ('GET')
     permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
@@ -247,7 +246,7 @@ class NotificationList(generics.ListAPIView):
     serializer_class = NotificationSerializer
 
 
-class NotificationUpdateState(generics.RetrieveUpdateAPIView):
+class NotificationUpdateState(viewsets.ModelViewSet):
     """
     Notification Details
     
@@ -264,10 +263,8 @@ class NotificationUpdateState(generics.RetrieveUpdateAPIView):
               description: the desired read status of the entry (true/false)
               required: false
     """
-    allowed_methods = ('GET','PATCH')
 
     permission_classes = [permissions.IsAuthenticated]
-    http_method_names = ['get', 'patch']
 
     def get_queryset(self):
         return Notification.objects.filter(owner=self.request.user)

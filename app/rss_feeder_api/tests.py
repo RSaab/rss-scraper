@@ -20,8 +20,6 @@ import pytest
 from dramatiq import Worker
 from rss_feeder_api import broker
 
-# import requests
-# from requests.auth import HTTPBasicAuth
 
 
 import logging

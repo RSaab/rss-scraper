@@ -18,23 +18,12 @@ from django.conf import settings
 
 import bleach
 
-# REST_FRAMEWORK = {
+REST_FRAMEWORK = {
 
-#     'DEFAULT_PERMISSION_CLASSES': (
-#         'rest_framework.permissions.IsAuthenticated',
-#     ),
-
-#     'DEFAULT_RENDERER_CLASSES': (
-#         'djangorestframework_camel_case.render.CamelCaseJSONRenderer',
-#         'djangorestframework_camel_case.render.CamelCaseBrowsableAPIRenderer',
-#     ),
-
-#     'DEFAULT_PARSER_CLASSES': (
-#         'djangorestframework_camel_case.parser.CamelCaseFormParser',
-#         'djangorestframework_camel_case.parser.CamelCaseMultiPartParser',
-#         'djangorestframework_camel_case.parser.CamelCaseJSONParser',
-#     ),
-# }
+    'DEFAULT_PERMISSION_CLASSES': (
+        'rest_framework.permissions.IsAuthenticated',
+    ),
+}
 
 # number of retries when trying to fetch a feed for update
 MAX_FEED_UPDATE_RETRIES = 3
@@ -66,14 +55,16 @@ DEBUG = int(os.environ.get("DEBUG", default=1))
 # ALLOWED_HOSTS = []
 # 'DJANGO_ALLOWED_HOSTS' should be a single string of hosts with a space between each.
 # For example: 'DJANGO_ALLOWED_HOSTS=localhost 127.0.0.1 [::1]'
+
 ALLOWED_HOSTS = os.environ.get("DJANGO_ALLOWED_HOSTS", "localhost 127.0.0.1").split(" ")
+
 
 
 # Application definition
 
 INSTALLED_APPS = [
     'drf_yasg',
-    'django_dramatiq',
+    "django_dramatiq",
     'rss_feeder_api.apps.RssFeederApiConfig',
     'rest_framework',
     'django.contrib.admin',

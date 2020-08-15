@@ -8,7 +8,7 @@ class UserSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = User
-        fields = '__all__'
+        fields = ['id', 'username', 'feeds']
 
 class FeedSerializer(serializers.ModelSerializer):
     owner = serializers.ReadOnlyField(source='owner.username')
