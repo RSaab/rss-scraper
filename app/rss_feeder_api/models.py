@@ -21,28 +21,52 @@ from rss_feeder_api import managers
 from django.core.validators import URLValidator
 import feedparser
 
+from rss_feeder.settings import MAX_FEED_UPDATE_RETRIES
+
 import json
+
+def backoff_hdlr(details):
+    print(details)
+    print ("Backing off {wait:0.1f} seconds afters {tries} tries "
+           "calling function {target} with args {args} and kwargs "
+           "{kwargs}".format(**details))
+    feed = details['args'][0]
+    wait = details['wait']
+    notification = Notification(feed=feed, owner=feed.owner, title='BackOff', message=f'Feed: {feed.id}, {feed.link} failed to update, retrying in {wait:0.1f}', is_error=True)
+    notification.save()
 
 @dramatiq.actor
 def feed_update_failure(message_data, exception_data):
-    # TODO notify user via notification/socket/publis to kafka etc...
+    """
+    A dramatiq callback on each failed attempt for a feed update
+    the user will notified by inserting a notification in the db 
+    only on the final failure
+
+    TODO: log all errors to somewhere for metrics and analysis
+    """
     feed_id = message_data['args'][0]
     feed = Feed.objects.get(pk=feed_id)
 
     notification = Notification(feed=feed, owner=feed.owner, title=exception_data['type'], message=exception_data['message']+f'[Feed: {feed.id}, {feed.link}]', is_error=True)
     notification.save()
-    print("feed update error")
+    print("dramatiq callback: feed update error")
 
 
 @dramatiq.actor
 def feed_update_success(message_data, result):
-    print("feed update success")
+    """
+    A dramatiq callback on successful attempt for a feed update
+    the user will notified by inserting a notification in the db 
+
+    TODO ??maybe log this also for checking failure/success rates?
+    """
+
     feed_id = message_data['args'][0]
     feed = Feed.objects.get(pk=feed_id)
 
     notification = Notification(feed=feed, owner=feed.owner, title='FeedUpdated', message=f'Feed: {feed.id}, {feed.link}, {feed.updated_at}]', is_error=False)
     notification.save()
-    print("notified")
+    print("dramatiq callback: : feed update success")
 
     
 # Exceptions #################################################   
@@ -57,14 +81,7 @@ class FeedError(Exception):
     def __init__(self, *args, **kwargs):
         super(FeedError, self).__init__(*args, **kwargs)
 
-class InactiveFeedError(FeedError):
-    pass
-    
-class EntryError(Exception):
-    """
-    An error occurred when processing an entry
-    """
-    pass
+
 # End: Exceptions #################################################   
 
 # Feed #################################################   
@@ -118,15 +135,17 @@ class Feed(models.Model):
 
         return
 
-    def force_pdate(self, *args, **kwargs):
+    def force_update(self, *args, **kwargs):
         print("Forcing update...")
         self._updateFeed.send_with_options(args=(self.id,), on_failure=feed_update_failure, on_success=feed_update_success)
         return
 
-    @backoff.on_exception(backoff.expo, FeedError, max_tries=2)
+    @backoff.on_exception(backoff.expo, FeedError, max_tries=MAX_FEED_UPDATE_RETRIES, on_backoff=backoff_hdlr)
     def _fetch_feed(self):
         '''
-        internal method to get feed details
+        internal method to get feed details from the link provided in self
+
+        returns raw feed and entry details as returned by the feedparser library
         '''
         # Request and parse the feed
         link = self.link
@@ -154,16 +173,19 @@ class Feed(models.Model):
             return self._fetch_feed()
 
         if status == 410:
-            raise InactiveFeedError('Feed has gone')
+            raise FeedError('Feed has gone')
 
         # Unknown status
         raise FeedError('Unrecognised HTTP status %s' % status)
 
 
-    @dramatiq.actor(max_retries=4, min_backoff=4, throws=FeedError)
+    @dramatiq.actor(max_retries=0, max_age=10000)#, throws=FeedError)
     @transaction.atomic
     def _updateFeed(pk):
-
+        """
+        An internal function that fetches a feed and parses it into the 
+        Feed object for the DB
+        """
         feed = get_object_or_404(Feed, pk=pk)
 
         rawFeed, entries = feed._fetch_feed() 

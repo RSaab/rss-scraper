@@ -1,6 +1,6 @@
 from django.test import TestCase
 
-from rss_feeder_api.models import Feed, Entry, FeedError
+from rss_feeder_api.models import Feed, Entry, FeedError, Notification
 from django.shortcuts import get_object_or_404
 
 
@@ -20,6 +20,13 @@ import pytest
 from dramatiq import Worker
 from rss_feeder_api import broker
 
+# import requests
+# from requests.auth import HTTPBasicAuth
+
+
+import logging
+logging.basicConfig(level=logging.DEBUG)
+
 @pytest.fixture
 def broker():
     broker = dramatiq.get_broker()
@@ -36,7 +43,6 @@ def worker(broker):
 @pytest.fixture
 def test_password():
    return 'strong-test-pass'
-
   
 @pytest.fixture
 def create_user(db, django_user_model, test_password):
@@ -66,7 +72,37 @@ def api_client():
 def test_unauthorized_request(api_client):
    url = reverse('all-feeds')
    response = api_client.get(url)
-   assert response.status_code == 403
+   assert response.status_code == 403, "all-feeds"
+
+   url = reverse('all-users')
+   response = api_client.get(url)
+   assert response.status_code == 403, "all-users"
+
+   url = reverse('all-notifications')
+   response = api_client.get(url)
+   assert response.status_code == 403, "all-notifications"
+
+
+   url = reverse('all-entries')
+   response = api_client.get(url)
+   assert response.status_code == 403, "all-entries"
+
+
+   url = reverse('feed-detail',  kwargs={'pk':1})
+   response = api_client.get(url)
+   assert response.status_code == 403, "feed-detail"
+
+   url = reverse('user-detail', kwargs={'pk':1})
+   response = api_client.get(url)
+   assert response.status_code == 403, "user-detail"
+
+   url = reverse('notification-detail', kwargs={'pk':1})
+   response = api_client.get(url)
+   assert response.status_code == 403, "notification-detail"
+
+   url = reverse('entry-detail', kwargs={'pk':1})
+   response = api_client.get(url)
+   assert response.status_code == 403, "entry-detail"
 
 @pytest.mark.django_db
 def test_auth_view(auto_login_user):
@@ -100,7 +136,7 @@ def test_register_and_update_feed(broker, worker):
 
     feed = Feed.objects.create(link="https://www.nu.nl/rss/Algemeen", owner=user, nickname="test")
 
-    feed.force_pdate()
+    feed.force_update()
 
     broker.join("default")
     worker.join()
@@ -115,7 +151,7 @@ def test_register_and_update_feed_with_redirect(broker, worker):
 
     feed = Feed.objects.create(link="http://www.nu.nl/rss/Algemeen", owner=user, nickname="test")
 
-    feed.force_pdate()
+    feed.force_update()
 
     broker.join("default")
     worker.join()
@@ -131,7 +167,7 @@ def test_register_and_update_feed_2(broker, worker):
 
     feed = Feed.objects.create(link="https://feeds.feedburner.com/tweakers/mixed", owner=user, nickname="test")
 
-    feed.force_pdate()
+    feed.force_update()
 
     broker.join("default")
     worker.join()
@@ -146,14 +182,16 @@ def test_register_and_update_feed_twice(broker, worker):
 
     feed = Feed.objects.create(link="https://feeds.feedburner.com/tweakers/mixed", owner=user, nickname="test")
 
-    feed.force_pdate()
-    feed.force_pdate()
+    feed.force_update()
+    feed.force_update()
 
     broker.join("default")
     worker.join()
 
     assert Feed.objects.count() == 1
-    assert Entry.objects.count() > 0
+    # this is not very good cuz the feed might have more than 40 at some point
+    # need a better way to check for double entries
+    assert Entry.objects.count() < 50
 
 
 @pytest.mark.django_db(transaction=True)
@@ -164,38 +202,100 @@ def test_register_and_update_invalid_feed(broker, worker):
 
     feed = Feed.objects.create(link="https://feeds.feedburner.com/WootWoot/mixed", owner=user, nickname="test")
 
-    feed.force_pdate()
+    feed.force_update()
 
     broker.join("default")
     worker.join()
 
     time.sleep(2)
     print("updating again")
-    feed.force_pdate()
+    feed.force_update()
 
     broker.join("default")
     worker.join()
 
-
     assert Feed.objects.count() == 1
     assert Entry.objects.count() == 0
 
-
 @pytest.mark.django_db(transaction=True)
-@pytest.mark.xfail(raises=FeedError)
-def test_register_and_update_invalid_feed_with_retry(broker, worker):
+def test_backoff(broker, worker):
+    print()
     user = User.objects.create_user('john', 'lennon@thebeatles.com', 'johnpassword')
     assert User.objects.count() == 1
 
-    feed = Feed.objects.create(link="https://feeds.feedburner.com/WootWoot/mixed", owner=user, nickname="test")
+    feed = Feed.objects.create(link="https://www.nu.nl/rss/AAAAAlgemeen", owner=user, nickname="test")
 
+    # feed.force_update()
     try:
-      feed._updateFeed(feed.id)
+      feed._fetch_feed()
     except:
-      print("exception caught, user should be notified")
-      feed.link = "https://feeds.feedburner.com/tweakers/mixed"
-      feed.save()
-      feed._updateFeed(feed.id)
+      pass
+    
+    # broker.join("default")
+    # worker.join()
 
+    # only one notification per attempts of the same call
+    assert Notification.objects.count() == 2, f'notification count error  {Notification.objects.count()}'
+    notification = Notification.objects.all()
+    assert notification[0].title == "BackOff" 
+    assert notification[1].title == "BackOff" 
+    
     assert Feed.objects.count() == 1
-    assert Entry.objects.count() > 0
+    assert Entry.objects.count() == 0
+
+@pytest.mark.django_db(transaction=True)
+def test_async_fetch_with_failed_notification(broker, worker):
+    print()
+    user = User.objects.create_user('john', 'lennon@thebeatles.com', 'johnpassword')
+    assert User.objects.count() == 1
+
+    feed = Feed.objects.create(link="https://www.nu.nl/rss/AAAAAlgemeen", owner=user, nickname="test")
+
+    feed.force_update()
+    
+    broker.join("default")
+    worker.join()
+
+    # only one notification per attempts of the same call
+    assert Notification.objects.count() == 1, f'notification count error  {Notification.objects.count()}'
+    notification = Notification.objects.get()
+    assert notification.title == "FeedError" 
+    
+    assert Feed.objects.count() == 1
+    assert Entry.objects.count() == 0
+
+@pytest.mark.django_db(transaction=True)
+def test_async_fetch_with_failed_notification_and_retry_with_success(broker, worker):
+    print()
+    user = User.objects.create_user('john', 'lennon@thebeatles.com', 'johnpassword')
+    assert User.objects.count() == 1
+
+    feed = Feed.objects.create(link="https://www.nu.nl/rss/AAAAAlgemeen", owner=user, nickname="test")
+
+    feed.force_update()
+    
+    broker.join("default")
+    worker.join()
+
+    # only one notification per attempts of the same call
+    assert Notification.objects.count() == 1, f'notification count error  {Notification.objects.count()}'
+    notification = Notification.objects.get()
+    assert notification.title == "FeedError" 
+    
+    assert Feed.objects.count() == 1
+    assert Entry.objects.count() == 0
+
+    # retry
+    feed.link = "https://www.nu.nl/rss/Algemeen"
+
+    feed.save()
+    
+    feed.force_update()
+    
+    broker.join("default")
+    worker.join()
+
+    count = Notification.objects.count()
+    assert  count == 2, f'notification count {count}'
+    notification = Notification.objects.all()
+    assert notification[0].title == "FeedUpdated" 

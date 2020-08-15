@@ -36,6 +36,9 @@ import bleach
 #     ),
 # }
 
+# number of retries when trying to fetch a feed for update
+MAX_FEED_UPDATE_RETRIES = 3
+
 SWAGGER_SETTINGS = {
     'PERSIST_AUTH': True,
     'REFETCH_SCHEMA_WITH_AUTH': True,
