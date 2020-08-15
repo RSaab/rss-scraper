@@ -158,7 +158,7 @@ def test_register_and_update_feed_twice(broker, worker):
 
 @pytest.mark.django_db(transaction=True)
 @pytest.mark.xfail(raises=FeedError)
-def test_register_and_update_invalid_field(broker, worker):
+def test_register_and_update_invalid_feed(broker, worker):
     user = User.objects.create_user('john', 'lennon@thebeatles.com', 'johnpassword')
     assert User.objects.count() == 1
 
@@ -179,3 +179,23 @@ def test_register_and_update_invalid_field(broker, worker):
 
     assert Feed.objects.count() == 1
     assert Entry.objects.count() == 0
+
+
+@pytest.mark.django_db(transaction=True)
+@pytest.mark.xfail(raises=FeedError)
+def test_register_and_update_invalid_feed_with_retry(broker, worker):
+    user = User.objects.create_user('john', 'lennon@thebeatles.com', 'johnpassword')
+    assert User.objects.count() == 1
+
+    feed = Feed.objects.create(link="https://feeds.feedburner.com/WootWoot/mixed", owner=user, nickname="test")
+
+    try:
+      feed._updateFeed(feed.id)
+    except:
+      print("exception caught, user should be notified")
+      feed.link = "https://feeds.feedburner.com/tweakers/mixed"
+      feed.save()
+      feed._updateFeed(feed.id)
+
+    assert Feed.objects.count() == 1
+    assert Entry.objects.count() > 0

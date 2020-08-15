@@ -17,12 +17,33 @@ from django.utils.translation import ugettext_lazy as _
 from rss_feeder_api.constants import ENTRY_UNREAD, ENTRY_READ, ENTRY_SAVED
 
 from rss_feeder_api import managers
-from rss_feeder_api.dramatiq_error_handlers import feed_update_failure
 
 from django.core.validators import URLValidator
 import feedparser
 
 import json
+
+@dramatiq.actor
+def feed_update_failure(message_data, exception_data):
+    # TODO notify user via notification/socket/publis to kafka etc...
+    feed_id = message_data['args'][0]
+    feed = Feed.objects.get(pk=feed_id)
+
+    notification = Notification(feed=feed, owner=feed.owner, title=exception_data['type'], message=exception_data['message']+f'[Feed: {feed.id}, {feed.link}]', is_error=True)
+    notification.save()
+    print("feed update error")
+
+
+@dramatiq.actor
+def feed_update_success(message_data, result):
+    print("feed update success")
+    feed_id = message_data['args'][0]
+    feed = Feed.objects.get(pk=feed_id)
+
+    notification = Notification(feed=feed, owner=feed.owner, title='FeedUpdated', message=f'Feed: {feed.id}, {feed.link}, {feed.updated_at}]', is_error=False)
+    notification.save()
+    print("notified")
+
     
 # Exceptions #################################################   
 class FeedError(Exception):
@@ -99,7 +120,7 @@ class Feed(models.Model):
 
     def force_pdate(self, *args, **kwargs):
         print("Forcing update...")
-        self._updateFeed.send_with_options(args=(self.id,), on_failure=feed_update_failure)
+        self._updateFeed.send_with_options(args=(self.id,), on_failure=feed_update_failure, on_success=feed_update_success)
         return
 
     @backoff.on_exception(backoff.expo, FeedError, max_tries=2)
@@ -113,7 +134,6 @@ class Feed(models.Model):
         status  = d.get('status', 200)
         feed    = d.get('feed', None)
         entries = d.get('entries', None)
-
         if status in (200, 302, 304, 307):
             if (
                 feed is None
@@ -189,7 +209,7 @@ class Feed(models.Model):
                 
                 if newEntry:
                     # if it was updated, then mark it as unread, otherwise no need to do anything
-                    if newEntry.pubdate > entry.pubdate:
+                    if newEntry.date > entry.date:
                         entry.state = ENTRY_UNREAD
                         id = newEntry.id
                         newEntry =  entry
@@ -270,3 +290,35 @@ class Entry(models.Model):
         ordering = ('-updated_at',)
         verbose_name_plural = 'entries'
         unique_together = ['guid']
+
+
+# Notification
+class Notification(models.Model):
+    '''
+    Notifications for users regarding feed updates
+    '''
+    owner = models.ForeignKey('auth.User', on_delete=models.CASCADE)
+    feed = models.ForeignKey(Feed, on_delete=models.CASCADE)
+    
+    state = models.IntegerField(default=ENTRY_UNREAD, choices=(
+        (ENTRY_UNREAD,  'Unread'),
+        (ENTRY_READ,    'Read'),
+    ))
+
+    title = models.CharField(max_length=200, null=True)
+    message = models.CharField(max_length=200, null=True)
+    is_error = models.BooleanField(default=False)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta: 
+        verbose_name = ("Notification")
+        verbose_name_plural = ("Notifications")
+        ordering = ('-updated_at',)
+
+    def __unicode__(self):
+        return self.title
+
+    def __str__(self):
+        return f'feed: {self.feed}, owner: {self.owner}'

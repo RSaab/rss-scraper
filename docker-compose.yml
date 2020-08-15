@@ -1,22 +1,46 @@
-version: "3"
+version: "3.7"
 services:
   rss-scraper:
     build: ./app
     command: python manage.py runserver 0.0.0.0:8000
+    restart: always
+    container_name: rss-scraper
+    depends_on:
+      - rabbitmq
+      - db
     volumes:
       - ./app:/usr/src/app/
     ports:
       - 8000:8000
     env_file:
       - ./.env.dev
+    networks:
+      - rss-network
   db:
     image: postgres:12.0-alpine
+    container_name: db
     volumes:
       - postgres_data:/var/lib/postgresql/data/
     environment:
       - POSTGRES_USER=hello_django
       - POSTGRES_PASSWORD=hello_django
       - POSTGRES_DB=hello_django_dev
+    restart: always
+    networks:
+      - rss-network
+  rabbitmq:
+    image: rabbitmq:3
+    restart: always
+    container_name: rabbitmq
+    expose:
+      - 5672
+    networks:
+      - rss-network
 
 volumes:
   postgres_data:
+
+networks:
+  rss-network:
+    driver: overlay
+    attachable: true

@@ -6,24 +6,49 @@ services:
       context: ./app
       dockerfile: Dockerfile.prod
     command: gunicorn rss_feeder.wsgi:application --bind 0.0.0.0:8000
+    container_name: rss-scraper
+    restart: always
     expose:
       - 8000
     env_file:
       - ./.env.prod
     depends_on:
       - db
+    networks:
+      - rss-network
   db:
     image: postgres:12.0-alpine
+    container_name: rss-scraper-db
+    restart: always
     volumes:
       - postgres_data:/var/lib/postgresql/data/
     env_file:
       - ./.env.prod.db
+    networks:
+      - rss-network
   nginx:
     build: ./nginx
+    container_name: rss-scraper-nginx
+    restart: always
     ports:
-      - 1337:80
+      - 8000:80
     depends_on:
       - rss-scraper
+    networks:
+      - rss-network
+  rabbitmq:
+    image: rabbitmq:3
+    restart: always
+    container_name: rabbitmq
+    expose:
+      - 5672
+    networks:
+      - rss-network
 
 volumes:
   postgres_data:
+
+networks:
+  rss-network:
+    driver: overlay
+    attachable: true

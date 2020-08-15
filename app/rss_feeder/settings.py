@@ -18,6 +18,35 @@ from django.conf import settings
 
 import bleach
 
+# REST_FRAMEWORK = {
+
+#     'DEFAULT_PERMISSION_CLASSES': (
+#         'rest_framework.permissions.IsAuthenticated',
+#     ),
+
+#     'DEFAULT_RENDERER_CLASSES': (
+#         'djangorestframework_camel_case.render.CamelCaseJSONRenderer',
+#         'djangorestframework_camel_case.render.CamelCaseBrowsableAPIRenderer',
+#     ),
+
+#     'DEFAULT_PARSER_CLASSES': (
+#         'djangorestframework_camel_case.parser.CamelCaseFormParser',
+#         'djangorestframework_camel_case.parser.CamelCaseMultiPartParser',
+#         'djangorestframework_camel_case.parser.CamelCaseJSONParser',
+#     ),
+# }
+
+SWAGGER_SETTINGS = {
+    'PERSIST_AUTH': True,
+    'REFETCH_SCHEMA_WITH_AUTH': True,
+    'REFETCH_SCHEMA_ON_LOGOUT': True,
+
+    'SECURITY_DEFINITIONS': {
+        'Basic': {
+            'type': 'basic'
+        }
+    }
+}
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve(strict=True).parent.parent
 
@@ -26,21 +55,22 @@ BASE_DIR = Path(__file__).resolve(strict=True).parent.parent
 
 # SECURITY WARNING: keep the secret key used in production secret!
 # SECRET_KEY = 'w^gc9@^i19$8yrjj6@dc96m-s+s)a@jt%8-@qn6*0$1!lib9ql'
-SECRET_KEY = os.environ.get("SECRET_KEY")
+SECRET_KEY = os.environ.get("SECRET_KEY", "NOTSOSECRET")
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = int(os.environ.get("DEBUG", default=0))
+DEBUG = int(os.environ.get("DEBUG", default=1))
 
 # ALLOWED_HOSTS = []
 # 'DJANGO_ALLOWED_HOSTS' should be a single string of hosts with a space between each.
 # For example: 'DJANGO_ALLOWED_HOSTS=localhost 127.0.0.1 [::1]'
-ALLOWED_HOSTS = os.environ.get("DJANGO_ALLOWED_HOSTS").split(" ")
+ALLOWED_HOSTS = os.environ.get("DJANGO_ALLOWED_HOSTS", "localhost 127.0.0.1").split(" ")
 
 
 # Application definition
 
 INSTALLED_APPS = [
-    "django_dramatiq",
+    'drf_yasg',
+    'django_dramatiq',
     'rss_feeder_api.apps.RssFeederApiConfig',
     'rest_framework',
     'django.contrib.admin',
@@ -221,21 +251,27 @@ ALLOWED_STYLES = getattr(
 )
 
 
+
 DRAMATIQ_BROKER = {
-    "BROKER": "dramatiq.brokers.stub.StubBroker",
-    "OPTIONS": {},
+    "BROKER": os.environ.get("DRAMATIQ_BROKER", "dramatiq.brokers.stub.StubBroker"),
+    # "OPTIONS": {
+    #     "url": os.environ.get("DRAMATIQ_BROKER_URL", "amqp://localhost:5672"),
+    # },
     "MIDDLEWARE": [
+        "dramatiq.middleware.Prometheus",
         "dramatiq.middleware.AgeLimit",
         "dramatiq.middleware.TimeLimit",
         "dramatiq.middleware.Callbacks",
-        "dramatiq.middleware.Pipelines",
         "dramatiq.middleware.Retries",
         "django_dramatiq.middleware.AdminMiddleware",
         "django_dramatiq.middleware.DbConnectionsMiddleware",
     ]
 }
 
+if not DRAMATIQ_BROKER['BROKER'] == 'dramatiq.brokers.stub.StubBroker':
+    DRAMATIQ_BROKER['OPTIONS'] = {"url": os.environ.get("DRAMATIQ_BROKER_URL", "amqp://localhost:5672")}
 
+# uncomment this if you are running the server with `python manage.py runserver' without environment variable
 # DRAMATIQ_BROKER = {
 #     "BROKER": "dramatiq.brokers.rabbitmq.RabbitmqBroker",
 #     "OPTIONS": {
@@ -256,4 +292,4 @@ DRAMATIQ_BROKER = {
 # AdminMiddleware is enabled.  The default value is "default".
 DRAMATIQ_TASKS_DATABASE = "default"
 
-APPEND_SLASH=True
+APPEND_SLASH=False
