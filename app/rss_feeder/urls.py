@@ -19,7 +19,7 @@ from django.urls import path, include
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('api/v1/auth/', include('rest_framework.urls')),
-    path('api/v1/', include('rss_feeder_api.urls'), name="myapi"),
+    path('api/v1/', include('rss_feeder_api.urls')),
 ]
 
 
@@ -35,9 +35,8 @@ schema_view = get_schema_view(
    openapi.Info(
       title="RSS Scraper API",
       default_version='v1',
-      description="Test description",
-      terms_of_service="https://www.google.com/policies/terms/",
-      contact=openapi.Contact(email="contact@snippets.local"),
+      description="RSS Scraper - Sendcloud Test",
+      contact=openapi.Contact(email="r.saab94@gamil.com"),
       license=openapi.License(name="BSD License"),
    ),
    public=True,

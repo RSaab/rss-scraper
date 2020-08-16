@@ -16,6 +16,7 @@ from rest_framework.authtoken.models import Token
 
 import dramatiq
 import pytest
+import json 
 
 from dramatiq import Worker
 from rss_feeder_api import broker
@@ -109,6 +110,7 @@ def test_auth_view(auto_login_user):
    response = client.get(url)
    print(response)
    assert response.status_code == 200
+
 
 @pytest.mark.django_db
 @pytest.mark.django_db(transaction=True)

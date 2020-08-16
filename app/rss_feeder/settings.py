@@ -18,19 +18,19 @@ from django.conf import settings
 
 import bleach
 
-REST_FRAMEWORK = {
+# REST_FRAMEWORK = {
 
-    'DEFAULT_PERMISSION_CLASSES': (
-        'rest_framework.permissions.IsAuthenticated',
-    ),
-}
+#     'DEFAULT_PERMISSION_CLASSES': (
+#         'rest_framework.permissions.IsAuthenticated',
+#     ),
+# }
 
 # number of retries when trying to fetch a feed for update
 MAX_FEED_UPDATE_RETRIES = 3
 
 SWAGGER_SETTINGS = {
     'PERSIST_AUTH': True,
-    'REFETCH_SCHEMA_WITH_AUTH': True,
+    # 'REFETCH_SCHEMA_WITH_AUTH': True,
     'REFETCH_SCHEMA_ON_LOGOUT': True,
 
     'SECURITY_DEFINITIONS': {
@@ -39,6 +39,7 @@ SWAGGER_SETTINGS = {
         }
     }
 }
+
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve(strict=True).parent.parent
 

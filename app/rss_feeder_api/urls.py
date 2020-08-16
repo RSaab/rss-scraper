@@ -20,5 +20,5 @@ router.register('notification', views.NotificationUpdateState, basename='notific
 # urlpatterns = router.urls
 
 urlpatterns = [
-	 path(r'^/', include((router.urls))),
+	 path('', include((router.urls))),
 ]
