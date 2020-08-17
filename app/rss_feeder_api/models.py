@@ -14,7 +14,7 @@ import dramatiq
 from django.utils.encoding import smart_text as smart_unicode
 from django.utils.translation import ugettext_lazy as _
 
-from rss_feeder_api.constants import ENTRY_UNREAD, ENTRY_READ, ENTRY_SAVED
+from rss_feeder_api.constants import ENTRY_UNREAD, ENTRY_READ
 
 from rss_feeder_api import managers
 
@@ -100,7 +100,6 @@ class Feed(models.Model):
     copyright = models.CharField(max_length=50, null=True)
     ttl = models.PositiveIntegerField(null=True)
     atomLogo = models.URLField(max_length = 200, null=True)
-    lastbuilddate = models.DateTimeField(null=True)
     pubdate = models.DateTimeField(null=True)
     nickname = models.CharField(max_length=60)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -245,7 +244,7 @@ class Feed(models.Model):
                 if len(dbEntriesCreate)>0:
                     Entry.objects.bulk_create(dbEntriesCreate)
                 if len(dbEntriesupdate)>0:
-                    fields = ['feed', 'state', 'expires', 'title' , 'content', 'date', 'author', 'url' ,'comments_url']
+                    fields = ['feed', 'state', 'title' , 'content', 'date', 'author', 'url' ,'comments_url']
                     Entry.objects.bulk_update(dbEntriesupdate, fields)
 
         return
@@ -263,10 +262,6 @@ class Entry(models.Model):
         (ENTRY_READ,    'Read'),
     ))
 
-    expires = models.DateTimeField(
-        blank=True, null=True, help_text="When the entry should expire",
-    )
-    
     # Compulsory data fields
     title = models.TextField(blank=True)
     content = models.TextField(blank=True)

@@ -6,7 +6,7 @@ from django.contrib.auth.models import User
 from rest_framework import permissions, status
 from rest_framework.response import Response
 
-from rss_feeder_api.constants import ENTRY_UNREAD, ENTRY_READ, ENTRY_SAVED
+from rss_feeder_api.constants import ENTRY_UNREAD, ENTRY_READ
 
 from django.shortcuts import get_object_or_404
 
@@ -40,6 +40,10 @@ class UserList(mixins.ListModelMixin,
 
 class UserDetail(mixins.RetrieveModelMixin,
                    viewsets.GenericViewSet):
+    
+    def get_queryset(self):
+        return Feed.objects.filter(id=self.request.user)
+
     """
     get:
         view a single user by id
@@ -47,7 +51,7 @@ class UserDetail(mixins.RetrieveModelMixin,
     def get(self, request, *args, **kwargs):
         return self.list(request, *args, **kwargs)
 
-    permission_classes = [permissions.IsAdminUser]
+    permission_classes = [permissions.IsAuthenticated]
     queryset = User.objects.all()
     serializer_class = UserSerializer
 
@@ -178,12 +182,12 @@ class FeedDetail(mixins.RetrieveModelMixin,
 
             Parameters:
                 - name: follow
-                  in: path
+                  in: query
                   type: boolean
                   description: Describes whether a user wantes to follow the feed or not (true/false)
                   required: false
                 - name: force_update
-                  in: path
+                  in: query
                   type: boolean
                   description: If set to true, will force an async update on the feed, default is false (true/false)
                   required: false
@@ -251,7 +255,7 @@ class NotificationUpdateState(viewsets.ModelViewSet):
     Notification Details
     
     get:
-        View a single entry
+        View a single notification
     
     patch:
         patch an notification with read/unread
@@ -260,7 +264,7 @@ class NotificationUpdateState(viewsets.ModelViewSet):
             - name: read
               in: path
               type: boolean
-              description: the desired read status of the entry (true/false)
+              description: the desired read status of the notification (true/false)
               required: false
     """
 

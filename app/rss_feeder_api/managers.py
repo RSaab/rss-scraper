@@ -5,7 +5,7 @@ import datetime
 import time
 
 from rss_feeder import settings
-from rss_feeder_api.constants import ENTRY_UNREAD, ENTRY_READ, ENTRY_SAVED
+from rss_feeder_api.constants import ENTRY_UNREAD, ENTRY_READ
 
 class FeedManager(models.Manager):
     pass
