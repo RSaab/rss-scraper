@@ -47,6 +47,10 @@ def feed_update_failure(message_data, exception_data):
     feed_id = message_data['args'][0]
     feed = Feed.objects.get(pk=feed_id)
 
+    # mark feed as failed to update and stop updateing it automatically
+    feed.flagged = True
+    feed.save()
+
     notification = Notification(feed=feed, owner=feed.owner, title=exception_data['type'], message=exception_data['message']+f'[Feed: {feed.id}, {feed.link}]', is_error=True)
     notification.save()
     print("dramatiq callback: feed update error")
@@ -105,6 +109,8 @@ class Feed(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     following = models.BooleanField(default=True)
+
+    flagged = models.BooleanField(default=False) 
 
     owner = models.ForeignKey('auth.User', related_name='feeds', on_delete=models.CASCADE)
 
