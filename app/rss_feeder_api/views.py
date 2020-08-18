@@ -8,57 +8,43 @@ from rest_framework.response import Response
 
 from rss_feeder_api.constants import ENTRY_UNREAD, ENTRY_READ
 
+
 from django.shortcuts import get_object_or_404
 
 from django.utils.decorators import method_decorator
 
-from drf_yasg import openapi
-from drf_yasg.inspectors import SwaggerAutoSchema
-from drf_yasg.utils import swagger_auto_schema
+# from drf_yasg import openapi
+# from drf_yasg.inspectors import SwaggerAutoSchema
+# from drf_yasg.utils import swagger_auto_schema
 
-from rest_framework.parsers import FileUploadParser, FormParser
+# from rest_framework.parsers import FileUploadParser, FormParser
 
-from rest_framework import viewsets, parsers
+from rest_framework import viewsets
 
 from rest_framework import mixins
 from rest_framework.decorators import action
 
-class UserList(mixins.ListModelMixin,
-                   viewsets.GenericViewSet):
-    """
-    get:
-        View all users
-    """
+####################################################
+####################################################
 
-    def get(self, request, *args, **kwargs):
-        return self.list(request, *args, **kwargs)
-
+class UserList(mixins.ListModelMixin, viewsets.GenericViewSet):
     permission_classes = [permissions.IsAdminUser]
     queryset = User.objects.filter()
     serializer_class = UserSerializer
 
-
-class UserDetail(mixins.RetrieveModelMixin,
-                   viewsets.GenericViewSet):
+class UserDetail(mixins.RetrieveModelMixin, viewsets.GenericViewSet):
     
     def get_queryset(self):
         return Feed.objects.filter(id=self.request.user)
-
-    """
-    get:
-        view a single user by id
-    """
-    def get(self, request, *args, **kwargs):
-        return self.list(request, *args, **kwargs)
 
     permission_classes = [permissions.IsAuthenticated]
     queryset = User.objects.all()
     serializer_class = UserSerializer
 
+####################################################
+####################################################
 
-
-class EntryList(mixins.ListModelMixin,
-                   viewsets.GenericViewSet):
+class EntryList(mixins.ListModelMixin,viewsets.GenericViewSet):
     """
     get:
         View all entries.
@@ -97,9 +83,6 @@ class EntryList(mixins.ListModelMixin,
     queryset = Entry.objects.all()
     serializer_class = EntrySerializer
 
-
-@swagger_auto_schema(method='put', auto_schema=None)
-@action(detail=False, methods=['put'])
 class EntryDetail(mixins.RetrieveModelMixin, mixins.UpdateModelMixin, viewsets.GenericViewSet):
     """
     Entry Details
@@ -122,7 +105,10 @@ class EntryDetail(mixins.RetrieveModelMixin, mixins.UpdateModelMixin, viewsets.G
     def get_queryset(self):
         return Entry.objects.filter(feed__owner=self.request.user)
 
-    def patch(self, request, *args, **kwargs):
+    def update(self, request, *args, **kwargs):
+        return Response("method not allowed", status=status.HTTP_401_UNAUTHORIZED)
+
+    def partial_update(self, request, *args, **kwargs):
         read = self.request.GET.get('read', None)
         
         entry = self.get_object()
@@ -133,15 +119,20 @@ class EntryDetail(mixins.RetrieveModelMixin, mixins.UpdateModelMixin, viewsets.G
             else:
                 entry.state = ENTRY_UNREAD
 
-        entry.save()
+        try:
+            entry.save()
+        except Exception as e:
+            return Response(str(e), status=status.HTTP_400_BAD_REQUEST)
+
         return Response(EntrySerializer(entry).data)
 
     queryset = Entry.objects.all()
     serializer_class = EntrySerializer
 
-class FeedList(mixins.CreateModelMixin,
-                   mixins.ListModelMixin,
-                   viewsets.GenericViewSet):#(viewsets.ModelViewSet):#(generics.ListCreateAPIView):
+####################################################
+####################################################
+
+class FeedList(mixins.CreateModelMixin,mixins.ListModelMixin,viewsets.GenericViewSet):
     """
     Feed API
     get:
@@ -149,29 +140,42 @@ class FeedList(mixins.CreateModelMixin,
     post:
         Create a new feed item. The feed is not updated until the next async update job is run or a separate force update is called
     """
+    queryset = Feed.objects.all()
+    serializer_class = FeedSerializer
     permission_classes = [permissions.IsAuthenticated]
 
     def perform_create(self, serializer):
         serializer.save(owner=self.request.user)
 
+    def create(self, request, *args, **kwargs):
+        serializer = FeedSerializer(data=request.data)
+
+        if serializer.is_valid():
+            try:
+                self.perform_create(serializer)
+                return Response(serializer.data, status=status.HTTP_201_CREATED)
+            except Exception as e:
+                return Response(str(e), status=status.HTTP_400_BAD_REQUEST)
+
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
     def get_queryset(self):
-        return Feed.objects.filter(owner=self.request.user)
+        following = self.request.GET.get('following', None)
 
-    def get(self, request, *args, **kwargs):
-        return self.list(request, *args, **kwargs)
+        filter_kwargs ={"owner": self.request.user}
+ 
+        if following:
+            if following == 'true' or following=='True':
+                filter_kwargs['following'] = True
+            else:
+                filter_kwargs['following'] = False
 
-    def post(self, request, *args, **kwargs):
-        return self.create(request, *args, **kwargs)
+        return Feed.objects.filter(**filter_kwargs)
 
-    queryset = Feed.objects.all()
-    serializer_class = FeedSerializer
+    # def get(self, request, *args, **kwargs):
+    #     return self.list(request, *args, **kwargs)
 
-from rest_framework import parsers
-
-class FeedDetail(mixins.RetrieveModelMixin,
-                   mixins.UpdateModelMixin,
-                   mixins.DestroyModelMixin,
-                   viewsets.GenericViewSet):#(generics.RetrieveUpdateDestroyAPIView):
+class FeedDetail(mixins.RetrieveModelMixin, mixins.UpdateModelMixin, mixins.DestroyModelMixin, viewsets.GenericViewSet):
     """
         Feed Detail API
         
@@ -197,27 +201,40 @@ class FeedDetail(mixins.RetrieveModelMixin,
     """
     permission_classes = [permissions.IsAuthenticated]
 
+    queryset = Feed.objects.all()
+    serializer_class = FeedSerializer
+
     def get_queryset(self):
         return Feed.objects.filter(owner=self.request.user)
     
-    def put(self, request, *args, **kwargs):
+
+    def update(self, request, pk=None):
         """
         Feed Put 
         """
-        feed = self.get_object()
+        # feed = self.get_object()
         serializer = FeedSerializer(feed, data=request.data)
 
         if serializer.is_valid():
             serializer.save()
             return Response(serializer.data)
+
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-    def patch(self, request, *args, **kwargs):
+    def partial_update(self, request, pk=None):
         force_update = self.request.GET.get('force_update', None)
         follow = self.request.GET.get('follow', None)
         
-        feed = self.get_object()
 
+        feed = self.get_object()
+        
+        link = request.data.get('link', None)
+        nickname = request.data.get('nickname', None)
+        if link:
+            feed.link = link
+
+        if nickname:
+            feed.nickname = nickname
 
         if follow:
             if follow == 'true' or follow=='True':
@@ -225,18 +242,21 @@ class FeedDetail(mixins.RetrieveModelMixin,
             else:
                 feed.following = False
 
-        feed.save()
+
+        try:
+            feed.save()
+        except Exception as e:
+            return Response(str(e), status=status.HTTP_400_BAD_REQUEST)
 
         if force_update == 'true' or force_update=='True':
-            feed.force_pdate()
+            feed.force_update()
 
         return Response(FeedSerializer(feed).data)
 
-    queryset = Feed.objects.all()
-    serializer_class = FeedSerializer
+####################################################
+####################################################
 
-
-class NotificationList(viewsets.ModelViewSet):
+class NotificationList(mixins.ListModelMixin, viewsets.GenericViewSet):
     """
     get:
         View all notifications
@@ -244,11 +264,20 @@ class NotificationList(viewsets.ModelViewSet):
     permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
-        return Notification.objects.filter(owner=self.request.user)
+        read = self.request.GET.get('read', None)
+
+        filter_kwargs ={"feed__owner": self.request.user}
+        
+        if read:
+            if read == 'true' or read=='True':
+                filter_kwargs['state'] = ENTRY_READ
+            else:
+                filter_kwargs['state'] = ENTRY_UNREAD
+
+        return Notification.objects.filter(**filter_kwargs)
 
     queryset = Notification.objects.all()
     serializer_class = NotificationSerializer
-
 
 class NotificationUpdateState(viewsets.ModelViewSet):
     """
@@ -270,6 +299,9 @@ class NotificationUpdateState(viewsets.ModelViewSet):
 
     permission_classes = [permissions.IsAuthenticated]
 
+    def update(self, request, *args, **kwargs):
+        return Response("method not allowed", status=status.HTTP_401_UNAUTHORIZED)
+
     def get_queryset(self):
         return Notification.objects.filter(owner=self.request.user)
         
@@ -284,8 +316,15 @@ class NotificationUpdateState(viewsets.ModelViewSet):
             else:
                 notification.state = ENTRY_UNREAD
 
-        notification.save()
+        try:
+            notification.save()
+        except Exception as e:
+            return Response(str(e), status=status.HTTP_400_BAD_REQUEST)
+
         return Response(NotificationSerializer(notification).data)
 
     queryset = Notification.objects.all()
     serializer_class = NotificationSerializer
+
+####################################################
+####################################################

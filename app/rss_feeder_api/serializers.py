@@ -1,6 +1,8 @@
 from rest_framework import serializers
 from rss_feeder_api.models import Feed, Entry, Notification
 
+from rest_framework.validators import UniqueTogetherValidator
+
 from django.contrib.auth.models import User
 
 class UserSerializer(serializers.ModelSerializer):
@@ -17,6 +19,12 @@ class FeedSerializer(serializers.ModelSerializer):
         model = Feed
         fields = '__all__'
         ordering = ['-created_at']
+        # validators = [
+        #     UniqueTogetherValidator(
+        #         queryset=Feed.objects.all(),
+        #         fields=['owner', 'link']
+        #     )
+        # ]
 
 class EntrySerializer(serializers.ModelSerializer):
     class Meta:

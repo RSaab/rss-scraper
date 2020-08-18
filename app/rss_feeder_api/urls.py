@@ -4,7 +4,7 @@ from rss_feeder_api import views
 
 from rest_framework import routers
 
-router = routers.SimpleRouter()
+router = routers.DefaultRouter()
 
 
 router.register('feed', views.FeedList, basename='all-feeds')
@@ -15,9 +15,6 @@ router.register('user', views.UserList, basename='all-users')
 router.register('user', views.UserDetail, basename='user')
 router.register('notification', views.NotificationList, basename='all-notifications')
 router.register('notification', views.NotificationUpdateState, basename='notification-detail')
-
-
-# urlpatterns = router.urls
 
 urlpatterns = [
 	 path('', include((router.urls))),

@@ -62,11 +62,16 @@ def feed_update_success(message_data, result):
     A dramatiq callback on successful attempt for a feed update
     the user will notified by inserting a notification in the db 
 
+    marks the feed as not flagged 
+
     TODO ??maybe log this also for checking failure/success rates?
     """
 
     feed_id = message_data['args'][0]
     feed = Feed.objects.get(pk=feed_id)
+
+    feed.flagged = False
+    feed.save()
 
     notification = Notification(feed=feed, owner=feed.owner, title='FeedUpdated', message=f'Feed: {feed.id}, {feed.link}, {feed.updated_at}]', is_error=False)
     notification.save()
@@ -158,6 +163,7 @@ class Feed(models.Model):
         status  = d.get('status', 200)
         feed    = d.get('feed', None)
         entries = d.get('entries', None)
+
         if status in (200, 302, 304, 307):
             if (
                 feed is None
@@ -198,7 +204,7 @@ class Feed(models.Model):
         feed.title = rawFeed.get('title', None)
         feed.subtitle = rawFeed.get('subtitle', None)
         feed.copyright = rawFeed.get('rights', None)
-        feed.link = rawFeed.get('link', None)
+        # feed.link = rawFeed.get('link', None)
         feed.ttl = rawFeed.get('ttl', None)
         feed.atomLogo = rawFeed.get('logo', None)
 
@@ -229,7 +235,7 @@ class Feed(models.Model):
                 # newEntry, created = Entry.objects.get_or_create(feed_id=feed.id, guid=entry.guid)
 
                 try:
-                    newEntry = Entry.objects.get(guid=entry.guid)
+                    newEntry = Entry.objects.get(guid=entry.guid, feed=feed)
                 except:
                     newEntry = None
 
@@ -312,7 +318,9 @@ class Entry(models.Model):
     class Meta:
         ordering = ('-updated_at',)
         verbose_name_plural = 'entries'
-        unique_together = ['guid']
+        # two users can have the same feed but one migh force update and the other 
+        # wants to keep old version, so make it unique even though it make entries redundant
+        unique_together = ['feed', 'guid']
 
 
 # Notification
