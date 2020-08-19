@@ -13,4 +13,9 @@ fi
 
 python manage.py rundramatiq &
 
+celery -A rss_feeder_api beat &
+
+celery -A rss_feeder_api worker &
+
+
 exec "$@"

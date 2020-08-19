@@ -18,12 +18,10 @@ from django.conf import settings
 
 import bleach
 
-# REST_FRAMEWORK = {
-
-#     'DEFAULT_PERMISSION_CLASSES': (
-#         'rest_framework.permissions.IsAuthenticated',
-#     ),
-# }
+REST_FRAMEWORK = {
+    'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
+    'PAGE_SIZE': 10
+}
 
 # number of retries when trying to fetch a feed for update
 MAX_FEED_UPDATE_RETRIES = 3
@@ -58,8 +56,6 @@ DEBUG = int(os.environ.get("DEBUG", default=1))
 # For example: 'DJANGO_ALLOWED_HOSTS=localhost 127.0.0.1 [::1]'
 
 ALLOWED_HOSTS = os.environ.get("DJANGO_ALLOWED_HOSTS", "localhost 127.0.0.1").split(" ")
-
-
 
 # Application definition
 
@@ -268,22 +264,9 @@ DRAMATIQ_BROKER = {
 if not DRAMATIQ_BROKER['BROKER'] == 'dramatiq.brokers.stub.StubBroker':
     DRAMATIQ_BROKER['OPTIONS'] = {"url": os.environ.get("DRAMATIQ_BROKER_URL", "amqp://localhost:5672")}
 
-# uncomment this if you are running the server with `python manage.py runserver' without environment variable
-# DRAMATIQ_BROKER = {
-#     "BROKER": "dramatiq.brokers.rabbitmq.RabbitmqBroker",
-#     "OPTIONS": {
-#         "url": "amqp://localhost:5672",
-#     },
-#     "MIDDLEWARE": [
-#         "dramatiq.middleware.Prometheus",
-#         "dramatiq.middleware.AgeLimit",
-#         "dramatiq.middleware.TimeLimit",
-#         "dramatiq.middleware.Callbacks",
-#         "dramatiq.middleware.Retries",
-#         "django_dramatiq.middleware.AdminMiddleware",
-#         "django_dramatiq.middleware.DbConnectionsMiddleware",
-#     ]
-# }
+BROKER_URL = os.environ.get("DRAMATIQ_BROKER_URL", "amqp://localhost:5672")
+CELERY_RESULT_BACKEND = os.environ.get("DRAMATIQ_BROKER_URL", "amqp://localhost:5672")
+
 
 # Defines which database should be used to persist Task objects when the
 # AdminMiddleware is enabled.  The default value is "default".

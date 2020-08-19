@@ -146,7 +146,7 @@ class Feed(models.Model):
         return
 
     def force_update(self, *args, **kwargs):
-        print("Forcing update...")
+        print(f'Forcing update [Feed ID: {self.id}], Nickname: {self.nickname}] ...')
         self._updateFeed.send_with_options(args=(self.id,), on_failure=feed_update_failure, on_success=feed_update_success)
         return
 

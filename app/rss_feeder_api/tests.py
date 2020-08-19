@@ -29,6 +29,10 @@ from rest_framework.test import APIClient
 import logging
 logging.basicConfig(level=logging.DEBUG)
 
+########################
+## Fixtures ############
+########################
+
 @pytest.fixture
 def broker():
     broker = dramatiq.get_broker()
@@ -69,43 +73,20 @@ def api_client():
    from rest_framework.test import APIClient
    return APIClient()
 
+@pytest.fixture
+def create_user_with_updated_feed(auto_login_user):
+  def make__user_with_updated_feed():
+    client, user = auto_login_user()
+    feed = Feed.objects.create(link="https://www.nu.nl/rss/Algemeen", owner=user, nickname="test")
+    feed._updateFeed(feed.id)
+    return user, feed, client
+  return make__user_with_updated_feed
 
 
+########################
+## API Tests ###########
+########################
 
-
-## API TESTS
-
-@pytest.mark.django_db(transaction=True)
-def test_post_and_update_feed(auto_login_user, broker, worker):
-  client, user = auto_login_user()
-  url = reverse('all-feeds-list')
-
-  data = {
-      "link": "https://feeds.feedburner.com/tweakers/mixed",
-      "nickname": "test"
-  }
-
-  response = client.post(url, data, format='json')
-
-  assert Entry.objects.count() == 0
-
-  response = client.get(url)
-  assert len(response.data) == 1
-  name = 'test2'
-  data = {
-      "nickname": name
-  }
-
-  content_type = 'application/json'
-  response = client.patch('/api/v1/feed/1/?force_update=true', data, content_type=content_type)
-
-  broker.join("default")
-  worker.join()
-
-  assert response.status_code == status.HTTP_200_OK
-  assert response.data['nickname'] == name 
-  assert Entry.objects.count() > 0 
-  
 
 @pytest.mark.django_db(transaction=True)
 def test_post_feed_twice(auto_login_user):
@@ -166,7 +147,6 @@ def test_auth_view(auto_login_user):
    client, user = auto_login_user()
    url = reverse('all-feeds-list')
    response = client.get(url)
-   print(response)
    assert response.status_code == 200
 
 @pytest.mark.django_db(transaction=True)
@@ -183,6 +163,42 @@ def test_post_feed(auto_login_user):
   assert Feed.objects.count() == 1
   assert response.status_code == 201
 
+
+@pytest.mark.django_db(transaction=True)
+def test_post_and_update_feed(auto_login_user, broker, worker):
+  client, user = auto_login_user()
+  url = reverse('all-feeds-list')
+
+  data = {
+      "link": "https://feeds.feedburner.com/tweakers/mixed",
+      "nickname": "test"
+  }
+
+  response = client.post(url, data, format='json')
+
+  feed_id = response.data['id']
+  assert Entry.objects.count() == 0
+
+  response = client.get(url)
+  assert response.data['count'] == 1
+  name = 'test2'
+  data = {
+      "nickname": name
+  }
+
+  content_type = 'application/json'
+  response = client.patch(f'/api/v1/feed/{feed_id}/?force_update=true', data, content_type=content_type)
+
+
+  assert response.status_code == status.HTTP_200_OK
+  assert response.data['nickname'] == name 
+
+  broker.join("default")
+  worker.join()
+
+  assert Entry.objects.count() > 0 
+  
+
 @pytest.mark.django_db(transaction=True)
 def test_get_feed(auto_login_user):
   client, user = auto_login_user()
@@ -196,7 +212,53 @@ def test_get_feed(auto_login_user):
   response = client.post(url, data, format='json')
 
   response = client.get(url)
-  assert len(response.data) == 1
+  assert response.data['count'] == 1
+
+
+@pytest.mark.django_db(transaction=True)
+def test_get_read_unread_entries(create_user_with_updated_feed):
+  user, feed, client = create_user_with_updated_feed()
+  url = reverse('all-entries-list')
+  response = client.get(url+"?read=true")
+  assert response.data['count'] == 0, "read entries exist, they shldnt"
+
+  response = client.get(url+"?read=false")
+  assert response.data['count'] > 0, "entries arent unread"
+
+  response = client.get(url+"?feed_id=2456532&read=false")
+  assert response.data['count'] == 0, "unread entries not filtered by feed id"
+
+  response = client.get(url+"?feed_id=24213211&read=true")
+  assert response.data['count'] == 0, "read entries not filtered by feed id"
+
+  response = client.get(url+f'?feed_id={feed.id}&read=true')
+  assert response.data['count'] == 0, "entries filtered by correct feed id but not by read status"
+  
+  response = client.get(url+f'?feed_id={feed.id}&read=false')
+  assert response.data['count'] > 0, "entries filtered by correct feed id but not by unread status"
+
+
+@pytest.mark.django_db(transaction=True)
+def test_patch_entry_state(create_user_with_updated_feed):
+  user, feed, client = create_user_with_updated_feed()
+  url = reverse('all-entries-list')
+  response = client.get(url+"?read=false")
+  assert response.data['count'] > 0, "read entries exist, they shldnt"
+
+  url_detail = reverse('entry-detail-detail', kwargs={'pk':response.data['results'][0]['id']})
+  response = client.patch(url_detail+f'?read=true')
+
+  response = client.get(url_detail)
+  assert response.data['state']==1, "state not read"
+
+  response = client.get(url+"?read=true")
+  print(response.data)
+  assert response.data['count'] == 1, "entry not patched "
+  
+########################
+## Unit Tests ##########
+########################
+
 @pytest.mark.django_db(transaction=True)
 def test_user_create():
     User.objects.create_user('john', 'lennon@thebeatles.com', 'johnpassword')
@@ -333,16 +395,11 @@ def test_backoff(broker, worker):
 
     feed = Feed.objects.create(link="https://www.nu.nl/rss/AAAAAlgemeen", owner=user, nickname="test")
 
-    # feed.force_update()
     try:
       feed._fetch_feed()
     except:
       pass
     
-    # broker.join("default")
-    # worker.join()
-
-    # only one notification per attempts of the same call
     assert Notification.objects.count() == 2, f'notification count error  {Notification.objects.count()}'
     notification = Notification.objects.all()
     assert notification[0].title == "BackOff" 
