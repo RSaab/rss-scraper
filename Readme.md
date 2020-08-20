@@ -99,3 +99,4 @@ The project has configurable options that are set via environment files passed t
 	- [ ] integrate full swagger-ui serving, OR
 	- [ ] serve serialized yaml file for use with online demo version on swagger-UI
 - [ ] metrics and monitoring for feed update failures
+- [ ] use docker swarm or Kubernetes for larger scale deployments across multiple machines
