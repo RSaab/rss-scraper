@@ -91,7 +91,7 @@ The project has configurable options that are set via environment files passed t
 
 ## ToDo:
 
-- [ ] use HTTPS and SSL certificates for nginx production setup
+- [x] use HTTPS and SSL certificates for nginx production setup
 - [ ] allow user sign up
 - [ ] use logging library and link container logs to disk files
 - [ ] use epoch timestamps for all date/time fields
