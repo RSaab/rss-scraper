@@ -1,8 +1,4 @@
-
-
-
-
-# Description
+# Project Description
 
 - [x] Follow and unfollow multiple feeds
 - [x] List all feeds registered by them
@@ -17,17 +13,19 @@
 	- [x] Users are notified and able to retry the feed update if it is stalled after these failed tries.
 - [x] pagination
 
-# Documentation
+# Tech Specs
 
 The application is packaged in docker containers and uses docker-compose for launching all services.
 
 It consists of the following services:
 	- RSS Feeder App which holds the functionality API,
-	- Database (PostgreSQL for production and docker developmet and sqlite for quick native prototyping)
+	- Database (PostgreSQL for production and docker development and sqlite for quick native prototyping)
 	- RabbitMQ  for async functions handled by Dramatiq
 	- Celery for running scheduled tasks 
 
 The project API documentation is written in swagger yaml format and can be viewed within the swagger-ui platform after downloading the schema.yaml from the server on the following endpoint `/static/api_schema.yaml` 
+
+A swagger-ui view is available through the drf-yasg package on the `/swagger/` endpoint. But it does not provide much features (query parameters are not parsed from docstrings) 
 
 # How To Run
 
@@ -35,10 +33,10 @@ The root directory of the project contains 4 shell scripts for getting the app u
 
 Once the containers are started, you can use the "createsuperuser.sh" script to create a super user that will allow you to interact with the API from the Swagger-UI platform.
 
-The api is by defualt available on: `localhost:8000/api/v1/`
+The API is by defualt available on: `localhost:8000/api/v1/`
 
 #### Development
- To start: ` ./start_development.sh`
+To start: `./start_development.sh`
 To stop: `./stop_development.sh`
 
 #### Production
@@ -55,6 +53,10 @@ Run the `./createsuperuser.sh` script and enter the user details
 Tests are written using pytest and can be run natively by installing the project requirements through pip within the "app" directory of the project
 
 ```
+cd rss-scraper/app
+
+python -m venv env
+
 pip install -r requirements.txt
 
 pytest
@@ -79,9 +81,11 @@ The project has configurable options that are set via environment files passed t
 
 ## ToDo:
 
-- [ ] use HTTPS and SSL certifiates for nginx production setup
-- [ ] use logging library andl Link container logs to disk files
+- [ ] use HTTPS and SSL certificates for nginx production setup
+- [ ] allow user sign up
+- [ ] use logging library and link container logs to disk files
 - [ ] use epoch timestamps for all date/time fields
 - [ ] Swagger-UI (for now it simply serves the ".yaml" schema file)
 	- [ ] integrate full swagger-ui serving, OR
 	- [ ] serve serialized yaml file for use with online demo version on swagger-UI
+- [ ] metrics and monitoring for feed update failures
