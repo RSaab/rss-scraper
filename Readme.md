@@ -18,10 +18,10 @@
 The application is packaged in docker containers and uses docker-compose for launching all services.
 
 It consists of the following services:
-	- RSS Feeder App which holds the functionality API,
-	- Database (PostgreSQL for production and docker development and sqlite for quick native prototyping)
-	- RabbitMQ  for async functions handled by Dramatiq
-	- Celery for running scheduled tasks 
+- RSS Feeder App which holds the functionality API,
+- Database (PostgreSQL for production and docker development and sqlite for quick native prototyping)
+- RabbitMQ  for async functions handled by Dramatiq
+- Celery for running scheduled tasks 
 
 The project API documentation is written in swagger yaml format and can be viewed within the swagger-ui platform after downloading the schema.yaml from the server on the following endpoint `/static/api_schema.yaml` 
 
