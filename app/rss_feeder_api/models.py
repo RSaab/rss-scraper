@@ -26,7 +26,6 @@ from rss_feeder.settings import MAX_FEED_UPDATE_RETRIES
 import json
 
 def backoff_hdlr(details):
-    print(details)
     print ("Backing off {wait:0.1f} seconds afters {tries} tries "
            "calling function {target} with args {args} and kwargs "
            "{kwargs}".format(**details))
@@ -99,6 +98,7 @@ class Feed(models.Model):
     The feeds model describes a registered field. 
     Its contains feed related information
     as well as user related info and other meta data
+
     '''
     link = models.URLField(max_length = 200)
     title = models.CharField(max_length=200, null=True)
@@ -146,6 +146,9 @@ class Feed(models.Model):
         return
 
     def force_update(self, *args, **kwargs):
+        '''
+        force updates a feed using a async call to the _updateFeed method
+        '''
         print(f'Forcing update [Feed ID: {self.id}], Nickname: {self.nickname}] ...')
         self._updateFeed.send_with_options(args=(self.id,), on_failure=feed_update_failure, on_success=feed_update_success)
         return
@@ -204,7 +207,6 @@ class Feed(models.Model):
         feed.title = rawFeed.get('title', None)
         feed.subtitle = rawFeed.get('subtitle', None)
         feed.copyright = rawFeed.get('rights', None)
-        # feed.link = rawFeed.get('link', None)
         feed.ttl = rawFeed.get('ttl', None)
         feed.atomLogo = rawFeed.get('logo', None)
 
@@ -223,16 +225,12 @@ class Feed(models.Model):
 
         super(Feed, feed).save()
 
-        # print(f'THE FEED: {feed}')
-
         if entries:
-            # print(f'THE ENTRIES: {entries}')
             dbEntriesCreate = []
             dbEntriesupdate = []
             for raw_entry in entries:
                 entry = Entry.objects.parseFromFeed(raw_entry)
                 entry.feed = feed
-                # newEntry, created = Entry.objects.get_or_create(feed_id=feed.id, guid=entry.guid)
 
                 try:
                     newEntry = Entry.objects.get(guid=entry.guid, feed=feed)
@@ -247,7 +245,6 @@ class Feed(models.Model):
                         id = newEntry.id
                         newEntry =  entry
                         newEntry.id = id
-                        print(f'OLD ENTRY: {newEntry}')
                         dbEntriesupdate.append(newEntry)
                 else:
                     dbEntriesCreate.append(entry)
@@ -264,6 +261,8 @@ class Feed(models.Model):
 # Enrty #################################################   
 class Entry(models.Model):
     """
+    Represents a feed entry object
+
     If creating from a feedparser entry, use Entry.objects.parseFromFeed()
     """
 
@@ -299,6 +298,8 @@ class Entry(models.Model):
         help_text="GUID for the entry, according to the feed",
     )
 
+    last_updated = models.DateTimeField(auto_now=True)
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -326,7 +327,7 @@ class Entry(models.Model):
 # Notification
 class Notification(models.Model):
     '''
-    Notifications for users regarding feed updates
+    Notifications for users. Currently used for feed update success/failure events
     '''
     owner = models.ForeignKey('auth.User', on_delete=models.CASCADE)
     feed = models.ForeignKey(Feed, on_delete=models.CASCADE)

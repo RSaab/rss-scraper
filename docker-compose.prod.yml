@@ -31,7 +31,8 @@ services:
     container_name: rss-scraper-nginx
     restart: always
     ports:
-      - 8000:80
+      - 8000:443
+      - 8001:80
     depends_on:
       - rss-scraper
     networks:

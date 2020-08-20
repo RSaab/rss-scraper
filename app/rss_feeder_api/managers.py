@@ -4,6 +4,8 @@ import bleach
 import datetime
 import time
 
+from django.utils import timezone
+
 from rss_feeder import settings
 from rss_feeder_api.constants import ENTRY_UNREAD, ENTRY_READ
 
@@ -60,6 +62,8 @@ class EntryManager(models.Manager):
         
         entry.author = raw.get('author', '')
         entry.comments_url = raw.get('comments', '')
+
+        entry.last_updated = timezone.now()
         
         return entry
         

@@ -13,12 +13,6 @@ from django.shortcuts import get_object_or_404
 
 from django.utils.decorators import method_decorator
 
-# from drf_yasg import openapi
-# from drf_yasg.inspectors import SwaggerAutoSchema
-# from drf_yasg.utils import swagger_auto_schema
-
-# from rest_framework.parsers import FileUploadParser, FormParser
-
 from rest_framework import viewsets
 
 from rest_framework import mixins
@@ -171,9 +165,6 @@ class FeedList(mixins.CreateModelMixin,mixins.ListModelMixin,viewsets.GenericVie
                 filter_kwargs['following'] = False
 
         return Feed.objects.filter(**filter_kwargs)
-
-    # def get(self, request, *args, **kwargs):
-    #     return self.list(request, *args, **kwargs)
 
 class FeedDetail(mixins.RetrieveModelMixin, mixins.UpdateModelMixin, mixins.DestroyModelMixin, viewsets.GenericViewSet):
     """

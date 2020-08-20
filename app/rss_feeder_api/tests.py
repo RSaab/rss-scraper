@@ -254,6 +254,23 @@ def test_patch_entry_state(create_user_with_updated_feed):
   response = client.get(url+"?read=true")
   print(response.data)
   assert response.data['count'] == 1, "entry not patched "
+
+@pytest.mark.django_db(transaction=True)
+def test_patch_feed_follow(create_user_with_updated_feed):
+  user, feed, client = create_user_with_updated_feed()
+  url = reverse('all-feeds-list')
+  response = client.get(url+"?follow=false")
+  assert response.data['count'] > 0, "unfollowed feeds exist, they shldnt"
+
+  url_detail = reverse('feeds-detail-detail', kwargs={'pk':response.data['results'][0]['id']})
+  response = client.patch(url_detail+f'?follow=false')
+
+  response = client.get(url_detail)
+  assert response.data['following']==0, "feed not unfollowed"
+
+  response = client.get(url+"?follow=false")
+  print(response.data)
+  assert response.data['count'] == 1, "no unfollowed feeds "
   
 ########################
 ## Unit Tests ##########

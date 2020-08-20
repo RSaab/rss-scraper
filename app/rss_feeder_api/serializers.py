@@ -18,19 +18,13 @@ class FeedSerializer(serializers.ModelSerializer):
     class Meta:
         model = Feed
         fields = '__all__'
-        ordering = ['-created_at']
-        # validators = [
-        #     UniqueTogetherValidator(
-        #         queryset=Feed.objects.all(),
-        #         fields=['owner', 'link']
-        #     )
-        # ]
+        ordering = ['-updated_at']
 
 class EntrySerializer(serializers.ModelSerializer):
     class Meta:
         model = Entry
         fields = '__all__'
-        ordering = ['-date']
+        ordering = ['-last_updated']
 
 class NotificationSerializer(serializers.ModelSerializer):
     class Meta:

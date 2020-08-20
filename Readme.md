@@ -44,6 +44,14 @@ Includes an nginx reverse proxy for load balancing
 To start: `./start_production.sh`
 To stop:`./stop_production.sh`
 
+Note: certificates should be created in the nginx project folder using the following commands
+
+`openssl dhparam -out dhparam.pem 2048`
+
+`openssl req -x509 -nodes -days 365 -newkey rsa:2048 -keyout nginx-selfsigned.key -out nginx-selfsigned.crt`
+
+I only included certificates in this git repo for ease of deployement, however in an actual project repo these would not be pushed to a git repo 
+
 #### Creating a super user for manual testing
 Run the `./createsuperuser.sh` script and enter the user details
 
@@ -56,6 +64,8 @@ Tests are written using pytest and can be run natively by installing the project
 cd rss-scraper/app
 
 python -m venv env
+
+source ./env/bin/activate
 
 pip install -r requirements.txt
 

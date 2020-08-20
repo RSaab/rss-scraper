@@ -1,5 +1,2 @@
 ENTRY_UNREAD = 0
 ENTRY_READ = 1
-
-ORDER_ASC = 'asc'
-ORDER_DESC = 'desc'
